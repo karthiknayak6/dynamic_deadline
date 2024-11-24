@@ -66,8 +66,10 @@ def main():
         raise ValueError("Please set ASANA_ACCESS_TOKEN environment variable")
 
     # Get the ngrok URL from user input
-    ngrok_url = input("Please enter your ngrok HTTPS URL: ")
-    webhook_url = f"{ngrok_url.rstrip('/')}/webhook"
+    webhook_url = os.getenv('WEBHOOK_URL')
+    if not webhook_url:
+        raise ValueError("Please set WEBHOOK_URL in environment variables")
+
 
     setup = AsanaWebhookSetup(access_token)
 
