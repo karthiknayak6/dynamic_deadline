@@ -75,8 +75,92 @@ def process_event(event):
                 print("High-priority task moved to 'In Progress', adjusting other tasks...")
                 adjust_due_dates_for_in_progress(task_id, task_data)
 
+            if is_high_priority_completed(task_data):
+                print("High-priority task moved to 'Completed', reducing due dates of other 'In Progress' tasks...")
+                reduce_due_dates_for_in_progress(task_id, task_data)
+
     except Exception as e:
         print(f"Error in process_event: {e}")
+
+
+def is_high_priority_completed(task_data):
+    try:
+        custom_fields = task_data.get('custom_fields', [])
+        stage_field = None
+        priority_field = None
+
+        for field in custom_fields:
+            if field.get('name', '').lower() == 'stage':
+                stage_field = field
+            if field.get('name', '').lower() == 'priority':
+                priority_field = field
+
+        if not stage_field or not stage_field.get('enum_value'):
+            print("Stage field not found or not set:", stage_field)
+            return False
+        if not priority_field or not priority_field.get('enum_value'):
+            print("Priority field not found or not set:", priority_field)
+            return False
+
+        stage = stage_field['enum_value'].get('name', '').lower()
+        priority = priority_field['enum_value'].get('name', '').lower()
+
+        print(f"Task Stage: {stage}, Priority: {priority}")
+        return stage == 'completed' and priority == 'high'
+
+    except Exception as e:
+        print(f"Error checking stage and priority: {e}")
+    return False
+
+
+def reduce_due_dates_for_in_progress(excluded_task_id, task_data):
+    """
+    Reduce the due dates for all tasks in 'In Progress' except the completed high-priority task.
+    """
+    try:
+        project_gid = task_data.get('memberships', [{}])[0].get('project', {}).get('gid')
+        if not project_gid:
+            return
+
+        in_progress_tasks = get_in_progress_tasks(project_gid)
+
+        print("OOOO: ",in_progress_tasks)
+        for task in in_progress_tasks:
+            task_id = task['gid']
+            if task_id == excluded_task_id:
+                continue
+
+            # Fetch task details to get the current due date
+            task_details = fetch_task_details(task_id)
+            if not task_details:
+                continue
+
+            current_due_date = task_details.get('due_on')
+            if not current_due_date:
+                continue
+
+            # Check if the due date is already updated to prevent infinite updates
+            
+
+            # Calculate the new due date (-2 days)
+            new_due_date = (datetime.strptime(current_due_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
+
+            # Update the task with the new due date
+            update_response = requests.put(
+                f"https://app.asana.com/api/1.0/tasks/{task_id}",
+                headers=HEADERS,
+                json={"data": {"due_on": new_due_date}}
+            )
+
+            if update_response.status_code == 200:
+                print(f"Updated due date for task {task_id} to {new_due_date}")
+                # Mark this task as processed with its new due date
+                processed_events.add((task_id, new_due_date))
+            else:
+                print(f"Failed to update due date for task {task_id}: {update_response.status_code} - {update_response.text}")
+
+    except Exception as e:
+        print(f"Error reducing due dates: {e}")
 
 
 def is_high_priority_in_progress(task_data):
