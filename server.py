@@ -166,9 +166,15 @@ def is_due_date_updated(task_id, current_due_date):
 
 def handle_priority_based_due_date(task_id, task_data):
     """
-    Sets a due date for the task based on its priority.
+    Sets a due date for the task based on its priority, but only if no due date is already assigned.
     """
     try:
+        # Check if a due date already exists
+        existing_due_date = task_data.get('due_on')
+        if existing_due_date:
+            print(f"Task {task_id} already has a due date: {existing_due_date}. Skipping priority-based due date assignment.")
+            return
+
         custom_fields = task_data.get('custom_fields', [])
         priority_field = None
         for field in custom_fields:
@@ -208,6 +214,7 @@ def handle_priority_based_due_date(task_id, task_data):
 
     except Exception as e:
         print(f"Error handling due date update: {e}")
+
 
 
 def get_in_progress_tasks(project_gid):
